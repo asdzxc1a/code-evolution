@@ -1,0 +1,64 @@
+name: ChatGPT Blender Lab
+
+on:
+  push:
+    branches: ['chatgpt/blender-lab-20260916']
+    paths:
+      - 'blender_lab/**'
+      - '.github/workflows/chatgpt-blender-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chatgpt-blender-lab-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  actual-blender-execution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1
+      - name: Download official Blender and verify SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/blender-lab-runtime"
+          cd "$RUNNER_TEMP/blender-lab-runtime"
+          curl -fLsS --retry 2 -O https://download.blender.org/release/Blender4.5/blender-4.5.9-linux-x64.tar.xz
+          curl -fLsS --retry 2 -O https://download.blender.org/release/Blender4.5/blender-4.5.9.sha256
+          grep 'blender-4.5.9-linux-x64.tar.xz' blender-4.5.9.sha256 | sha256sum -c -
+          tar -xf blender-4.5.9-linux-x64.tar.xz
+          echo "$RUNNER_TEMP/blender-lab-runtime/blender-4.5.9-linux-x64" >> "$GITHUB_PATH"
+      - name: Run real Blender, evaluate nodes, save project, and render
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p blender_output
+          blender --version
+          blender --background --factory-startup --threads 2 --python-exit-code 1 --python blender_lab/chatgpt_blender_lab.py -- --out blender_output 2>&1 | tee blender_output/execution.log
+          test -s blender_output/proof.json
+          cat blender_output/proof.json
+      - name: Verify saved project and add-on registration
+        shell: bash
+        run: |
+          set -euo pipefail
+          blender --background --factory-startup blender_output/chatgpt_blender_lab.blend --python-exit-code 1 --python-expr "import bpy, importlib.util; s=importlib.util.spec_from_file_location('chatgpt_blender_lab', 'blender_lab/chatgpt_blender_lab.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.register(); assert hasattr(bpy.types, 'CHATGPT_PT_blender_lab'); m.unregister(); assert bpy.data.objects.get('ChatGPT_Helix_1') is not None; print('BLENDER_REOPEN_AND_ADDON_TEST_PASS')" 2>&1 | tee blender_output/reopen_and_addon.log
+      - name: Package project, render, plugin, and verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatGPT-Blender-Lab
+          path: |
+            blender_output/
+            blender_lab/chatgpt_blender_lab.py
+          retention-days: 14
+          if-no-files-found: error
