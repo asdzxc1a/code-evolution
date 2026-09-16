@@ -1,4 +1,4 @@
-"""Apply reviewed v1.1 visual corrections to the reproducible Sienna builder.
+"""Apply reviewed v1.2 visual corrections to the reproducible Sienna builder.
 Usage: python3 polish_sienna.py input_builder.py output_builder.py
 The output is a complete, readable standalone Blender script.
 """
@@ -12,7 +12,7 @@ patches={
 "(.34,.11,.51)":"(.34,.11,.45)",
 "(-.67,.02,.51)":"(-.67,.02,.45)",
 "uv('Body | foot '+label,(xx,yy-.08,.35),(.135,.25,.18),skin,rot=(.50,0,0))":"uv('Pump | upper '+label,(xx,yy-.07,.345),(.137,.23,.155),black,rot=(.50,0,0))",
-"(3.18,.62,.35,.075,0),(3.23,.628,.353,.075,0),(3.47,.666,.373,.07,0),(3.76,.72,.39,.064,0),(4.02,.728,.388,.05,0),(4.22,.668,.36,.025,0)":"(3.18,.748,.393,.06,0),(3.23,.752,.397,.06,0),(3.47,.771,.413,.06,0),(3.76,.785,.423,.056,0),(4.02,.763,.409,.045,0),(4.22,.678,.373,.023,0)",
+"(3.18,.62,.35,.075,0),(3.23,.628,.353,.075,0),(3.47,.666,.373,.07,0),(3.76,.72,.39,.064,0),(4.02,.728,.388,.05,0),(4.22,.668,.36,.025,0)":"(3.18,.823,.463,.035,0),(3.23,.824,.464,.035,0),(3.47,.825,.465,.035,0),(3.76,.805,.445,.04,0),(4.02,.778,.425,.035,0),(4.22,.690,.385,.020,0)",
 "curve('Dress | tailored seam '+str(sign),[(sign*.29,-.31,5.54),(sign*.25,-.265,5.13),(sign*.22,-.245,4.80),(sign*.29,-.286,4.39),(sign*.40,-.315,4.01),(sign*.385,-.32,3.50)],.008,burgundy)":"pass  # Avoid decorative curves floating above the smooth dress surface.",
 }
 for old,new in patches.items():
@@ -23,7 +23,7 @@ addition='''    # Preserve editable construction meshes, then blend skin joins f
     construction=bpy.data.collections.new('00  Construction meshes - hidden backup')
     SCENE.collection.children.link(construction)
     construction.hide_render=True; construction.hide_viewport=True
-    skinparts=[o for o in COL.objects if o.type=='MESH' and (o.name.startswith('Body |') or o.name.startswith('Hand |'))]
+    skinparts=[o for o in COL.objects if o.type=='MESH' and (o.name.startswith('Body |') or o.name.startswith('Hand | palm') or o.name.startswith('Hand | thumb'))]
     for original in skinparts:
         backup=original.copy(); backup.data=original.data.copy()
         construction.objects.link(backup); backup.name='SOURCE | '+original.name
