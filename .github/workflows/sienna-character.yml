@@ -1,0 +1,57 @@
+name: Sienna Character
+on:
+  push:
+    branches: ['chatgpt/blender-lab-20260916']
+    paths:
+      - 'characters/**'
+      - '.github/workflows/sienna-character.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sienna-character-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  render-character:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libgl1
+      - name: Verified official Blender runtime
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/blender-runtime"
+          cd "$RUNNER_TEMP/blender-runtime"
+          curl -fLsS --retry 2 -O https://download.blender.org/release/Blender4.5/blender-4.5.9-linux-x64.tar.xz
+          curl -fLsS --retry 2 -O https://download.blender.org/release/Blender4.5/blender-4.5.9.sha256
+          grep 'blender-4.5.9-linux-x64.tar.xz' blender-4.5.9.sha256 | sha256sum -c -
+          tar -xf blender-4.5.9-linux-x64.tar.xz
+          echo "$RUNNER_TEMP/blender-runtime/blender-4.5.9-linux-x64" >> "$GITHUB_PATH"
+      - name: Build actual meshes and render character
+        run: |
+          set -euo pipefail
+          mkdir -p character_output
+          python3 characters/polish_sienna.py characters/sienna.py character_output/build_sienna.py
+          blender --background --factory-startup --threads 4 --python-exit-code 1 --python character_output/build_sienna.py -- --out character_output --quality final 2>&1 | tee character_output/execution.log
+          test -s character_output/proof.json
+      - name: Verify saved project and exported glTF
+        run: |
+          set -euo pipefail
+          blender --background --factory-startup character_output/Sienna_Character.blend --python-exit-code 1 --python-expr "import bpy; assert bpy.data.objects.get('Body | continuous skin sculpt'); assert bpy.data.objects.get('Dress | fitted satin'); assert bpy.data.objects.get('SIENNA | head tilt control'); assert len(bpy.data.cameras)>=3; print('SIENNA_BLEND_REOPEN_PASS')" 2>&1 | tee character_output/reopen.log
+          blender --background --factory-startup --python-exit-code 1 --python-expr "import bpy; bpy.ops.import_scene.gltf(filepath='character_output/Sienna_Character.glb'); assert len([o for o in bpy.context.scene.objects if o.type=='MESH'])>10; print('SIENNA_GLB_REIMPORT_PASS')" 2>&1 | tee character_output/gltf_validation.log
+      - name: Remove automatic save backup from download
+        run: rm -f character_output/Sienna_Character.blend1
+      - name: Downloadable character project
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sienna-Character
+          path: character_output/
+          retention-days: 14
+          if-no-files-found: error
